@@ -2,6 +2,7 @@
 #define ICSP_HPP
 #include <stdint.h>
 #include <stddef.h>
+#include <hardware/spi.h>
 
 enum {
     ICSP_ERASE_REGION_EEPROM = 1,

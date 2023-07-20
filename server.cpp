@@ -59,7 +59,7 @@ int main() {
             icsp_enter_lvp();
             uint16_t id = icsp_get_device_id();
             uint16_t rev = icsp_get_revision_id();
-            if ((id == 0xFFFF && rev == 0xFFFF) || (id == 0 || rev == 0)) {
+            if (/*(id == 0xFFFF && rev == 0xFFFF) ||*/ (id == 0 || rev == 0)) {
                 printf("Error: Could not get chip ID\n");
                 icsp_exit_lvp();
                 continue;
@@ -67,6 +67,9 @@ int main() {
             printf("Chip ID: %04x rev %04x\nErasing\n", id, rev);
             icsp_cmd_erase(ICSP_ERASE_REGION_FLASH | ICSP_ERASE_REGION_EEPROM | ICSP_ERASE_REGION_CONFIG);
             init = true;
+            addr_hi = 0;
+            addr &= 0xFFFF;
+            gpio_put(PICO_DEFAULT_LED_PIN, true);
         }
         switch (rec) {
             case 0: {
@@ -80,8 +83,8 @@ int main() {
                         }
                         program[i] = l;
                     }
-                    printf("Writing to %06X (%d bytes, EEPROM)\n", addr, bc);
-                    icsp_program_page_8bit(addr, program, bc, false);
+                    printf("Writing to %06X (%d bytes, EEPROM)... ", addr, bc);
+                    printf("%d bytes written\n", icsp_program_page_8bit(addr, program, bc, false));
                 } else {
                     uint16_t program[32];
                     bc >>= 1;
@@ -98,8 +101,8 @@ int main() {
                         }
                         program[i] = l | (h << 8);
                     }
-                    printf("Writing to %06X (%d words, flash)\n", addr, bc);
-                    icsp_program_page(addr, program, bc, false);
+                    printf("Writing to %06X (%d words, flash)... ", addr, bc);
+                    printf("%d bytes written\n", icsp_program_page(addr, program, bc, false));
                 }
                 break;
             }
@@ -107,6 +110,7 @@ int main() {
                 printf("Programming complete; exiting LVP\n");
                 icsp_exit_lvp();
                 init = false;
+                gpio_put(PICO_DEFAULT_LED_PIN, false);
                 break;
             }
             case 4: {

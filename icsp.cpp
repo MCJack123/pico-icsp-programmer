@@ -10,17 +10,21 @@ void icsp_init(spi_inst_t *spi_, int pin_mclr, int pin_dat, int pin_clk, int pin
     gpio_init(pin_mclr);
     gpio_init(pin_dat);
     gpio_init(pin_clk);
-    if (pin_dat_in != -1) {
-        gpio_init(pin_dat_in);
-        gpio_set_function(pin_dat_in, GPIO_FUNC_SPI);
-    }
+    gpio_set_function(pin_mclr, GPIO_FUNC_SIO);
     gpio_set_function(pin_dat, GPIO_FUNC_SPI);
     gpio_set_function(pin_clk, GPIO_FUNC_SPI);
-    gpio_set_function(pin_mclr, GPIO_FUNC_NULL);
-    gpio_put(pin_mclr, 1);
+    gpio_set_dir(pin_mclr, GPIO_OUT);
+    gpio_set_dir(pin_dat, GPIO_OUT);
+    gpio_set_dir(pin_clk, GPIO_OUT);
+    if (pin_dat_in != -1) {
+        gpio_init(pin_dat_in);
+        gpio_set_function(pin_dat_in, GPIO_FUNC_NULL);
+        gpio_set_dir(pin_dat_in, GPIO_IN);
+    }
+    gpio_put(pin_mclr, true);
     spi_init(spi_, 5'000'000); // 100 ns high + 100 ns low pulse width = 5 MHz
     spi_set_slave(spi_, false);
-    spi_set_format(spi_, 8, SPI_CPOL_1, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_format(spi_, 8, SPI_CPOL_0, SPI_CPHA_1, SPI_MSB_FIRST);
     dataOutPin = pin_dat;
     dataInPin = pin_dat_in;
     clockPin = pin_clk;
@@ -30,20 +34,20 @@ void icsp_init(spi_inst_t *spi_, int pin_mclr, int pin_dat, int pin_clk, int pin
 
 void icsp_enter_lvp() {
     gpio_put(mclrPin, 0);
-    sleep_us(1);
-    spi_write_blocking(spi, "MCHP", 4);
-    sleep_us(1);
+    sleep_ms(50);
+    spi_write_blocking(spi, (const uint8_t*)"MCHP", 4);
+    sleep_us(50);
 }
 
 void icsp_exit_lvp() {
     gpio_put(mclrPin, 1);
-    sleep_us(1);
+    sleep_ms(50);
 }
 
 void icsp_send_command(uint8_t cmd, int payload) {
     spi_write_blocking(spi, &cmd, 1);
     if (payload >= 0) {
-        uint8_t pl[3] = {(payload >> 16) & 0xFF, (payload >> 8) & 0xFF, payload & 0xFF};
+        uint8_t pl[3] = {(payload >> 15) & 0xFF, (payload >> 7) & 0xFF, (payload << 1) & 0xFF};
         spi_write_blocking(spi, pl, 3);
     }
 }
@@ -53,7 +57,7 @@ void icsp_cmd_loadpc(int pc) {
 }
 
 void icsp_cmd_erase(int regions) {
-    icsp_send_command(ICSP_COMMAND_BULK_ERASE, regions << 1);
+    icsp_send_command(ICSP_COMMAND_BULK_ERASE, regions);
     sleep_ms(11);
 }
 
@@ -67,11 +71,12 @@ uint16_t icsp_cmd_read_data(bool increment_pc) {
     uint8_t cmd = (increment_pc ? ICSP_COMMAND_READ_DATA_INCPC : ICSP_COMMAND_READ_DATA);
     spi_write_blocking(spi, &cmd, 1);
     gpio_set_function(dataOutPin, GPIO_FUNC_NULL);
-    gpio_set_dir(dataOutPin, GPIO_IN);
-    // 100 ns should have passed by now
+    gpio_set_function(dataInPin, GPIO_FUNC_SPI);
     uint8_t data[3];
     spi_read_blocking(spi, 0, data, 3);
-    return (data[1] << 8) | data[0];
+    gpio_set_function(dataInPin, GPIO_FUNC_NULL);
+    gpio_set_function(dataOutPin, GPIO_FUNC_SPI);
+    return (data[0] << 15) | (data[1] << 7) | (data[2] >> 1);
 }
 
 void icsp_cmd_increment_pc() {
@@ -79,7 +84,7 @@ void icsp_cmd_increment_pc() {
 }
 
 void icsp_cmd_write_data(uint16_t value, bool increment_pc) {
-    icsp_send_command(increment_pc ? ICSP_COMMAND_READ_DATA_INCPC : ICSP_COMMAND_READ_DATA, value);
+    icsp_send_command(increment_pc ? ICSP_COMMAND_PROGRAM_DATA_INCPC : ICSP_COMMAND_PROGRAM_DATA, value);
     sleep_us(75);
 }
 

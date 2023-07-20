@@ -1,7 +1,7 @@
 # pico-icsp-programmer
 ICSP programmer for PIC18FxxQxx family devices on Raspberry Pi Pico
 
-Currently untested. Use at your own risk.
+Not supported by Microchip. Use at your own risk.
 
 ## Usage
 Build with CMake (`mkdir build; cd build; cmake ..; cmake --build .`), then drop the UF2 file onto a BOOTSEL-booted Pi Pico.

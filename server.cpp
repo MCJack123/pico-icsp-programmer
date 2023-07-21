@@ -23,6 +23,22 @@ static int htob() {
     return n;
 }
 
+static const char * chipIDs[] = {
+    // Starts at 0x7500, shifted right 5 bits
+    // 0x74E0 (PIC18F15Q41) handled separately
+    "PIC18F05Q41", // 0x7500 (PIC18F05Q41)
+    "PIC18F14Q41", // 0x7520 (PIC18F14Q41)
+    "PIC18F04Q41", // 0x7540 (PIC18F04Q41)
+    "PIC18F16Q41", // 0x7560 (PIC18F16Q41)
+    "PIC18F06Q41", // 0x7580 (PIC18F06Q41)
+    "PIC16F16Q40", // 0x75A0 (PIC16F16Q40)
+    "PIC18F06Q40", // 0x75C0 (PIC18F06Q40)
+    "PIC18F15Q40", // 0x75E0 (PIC18F15Q40)
+    "PIC18F05Q40", // 0x7600 (PIC18F05Q40)
+    "PIC18F14Q40", // 0x7620 (PIC18F14Q40)
+    "PIC18F04Q40"  // 0x7640 (PIC18F04Q40)
+};
+
 int main() {
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, true);
@@ -59,12 +75,17 @@ int main() {
             icsp_enter_lvp();
             uint16_t id = icsp_get_device_id();
             uint16_t rev = icsp_get_revision_id();
-            if (/*(id == 0xFFFF && rev == 0xFFFF) ||*/ (id == 0 || rev == 0)) {
+            if ((id == 0xFFFF && rev == 0xFFFF) || (id == 0 || rev == 0)) {
                 printf("Error: Could not get chip ID\n");
                 icsp_exit_lvp();
                 continue;
             }
-            printf("Chip ID: %04x rev %04x\nErasing\n", id, rev);
+            const char * name;
+            if ((id & 0xFC1F) != 0x7400) name = "Unknown";
+            else if (id == 0x74E0) name = "PIC18F15Q41";
+            else if (id < 0x7500 || id > 0x7640) name = "Unknown";
+            else name = chipIDs[((id - 0x7500) >> 5) & 0x1F];
+            printf("Chip ID: %s rev %c%d (%04x %04x)\nErasing\n", name, ((rev >> 6) & 0x1F) + 65, rev & 0x1F, id, rev);
             icsp_cmd_erase(ICSP_ERASE_REGION_FLASH | ICSP_ERASE_REGION_EEPROM | ICSP_ERASE_REGION_CONFIG);
             init = true;
             addr_hi = 0;
@@ -102,7 +123,7 @@ int main() {
                         program[i] = l | (h << 8);
                     }
                     printf("Writing to %06X (%d words, flash)... ", addr, bc);
-                    printf("%d bytes written\n", icsp_program_page(addr, program, bc, false));
+                    printf("%d words written\n", icsp_program_page(addr, program, bc, false));
                 }
                 break;
             }

@@ -34,16 +34,17 @@ void icsp_init(spi_inst_t *spi_, int pin_mclr, int pin_dat, int pin_clk, int pin
 
 void icsp_enter_lvp() {
     gpio_put(mclrPin, 0);
-    sleep_ms(50);
+    sleep_ms(5);
     spi_write_blocking(spi, (const uint8_t*)"MCHP", 4);
-    sleep_us(50);
+    sleep_ms(5);
 }
 
 void icsp_exit_lvp() {
     gpio_put(mclrPin, 1);
-    sleep_ms(50);
+    sleep_ms(5);
 }
 
+void icsp_send_command(uint8_t cmd, int payload) __attribute__((optimize("O0")));
 void icsp_send_command(uint8_t cmd, int payload) {
     spi_write_blocking(spi, &cmd, 1);
     if (payload >= 0) {
@@ -90,11 +91,13 @@ void icsp_cmd_write_data(uint16_t value, bool increment_pc) {
 
 uint16_t icsp_get_device_id() {
     icsp_cmd_loadpc(0x3FFFFE);
+    sleep_us(1);
     return icsp_cmd_read_data(false);
 }
 
 uint16_t icsp_get_revision_id() {
     icsp_cmd_loadpc(0x3FFFFC);
+    sleep_us(1);
     return icsp_cmd_read_data(false);
 }
 
